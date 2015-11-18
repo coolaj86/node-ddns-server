@@ -30,18 +30,24 @@ module.exports.create = function (walnutConf, deps/*, options*/) {
     }
   ];
 
-  function getZone(DnsStore, names, namesMap) {
+  function getZone(DnsStore, zones, zonesMap) {
     var promise = PromiseA.resolve();
 
-    names.forEach(function (name) {
+    zones.forEach(function (zone) {
       promise = promise.then(function () {
 
         // TODO this won't perform well with thousands of records (but that's not a problem yet)
         // maybe store a list of big zones with subzones in memory?
         // (and assume a single device won't more than 100 of them - which would be 100,000 domains)
-        return DnsStore.find({ name: name }).then(function (rows) {
-          namesMap[name] = rows;
-          //names.push(rows);
+        return DnsStore.Domains.find({ zone: zone }).then(function (rows) {
+          rows.forEach(function (row) {
+            if (!row.name) {
+              row.name = row.zone;
+            }
+          });
+
+          zonesMap[zone] = rows;
+          //zones.push(rows);
         });
       });
     });
@@ -58,36 +64,36 @@ module.exports.create = function (walnutConf, deps/*, options*/) {
     function getAnswerList(questions, cb) {
       // cb is of type function (err, answers) { }
       // answers is an array of type { name: string, type: string, priority: int, ttl: int, answer: string }
-      var namesMap = {};
-      var names = [];
+      var zonesMap = {};
+      var zones = [];
 
       // determine the zone and then grab all records in the zone
       // 'music.cloud.jake.smithfamily.com'.split('.').slice(-2).join('.')
       // smithfamily.com // this is the zone (sorry jake, no zone for you)
-      questions.map(function (q) {
+      questions.forEach(function (q) {
         // TODO how to get zone fast and then get records?
         var parts = q.name.split('.').filter(function (n) {
           return n;
         });
-        var name = parts.slice(-2).join('.');
+        var zone = parts.slice(-2).join('.');
 
         if (parts.length < 2) {
           return;
         }
 
-        if (!namesMap[name]) {
-          namesMap[name] = true;
-          names.push(name);
+        if (!zonesMap[zone]) {
+          zonesMap[zone] = true;
+          zones.push(zone);
           return;
         }
       });
 
       // TODO handle recursive ANAME (and CNAME?) lookup
-      return getZone(DnsStore, names, namesMap).then(function () {
+      return getZone(DnsStore, zones, zonesMap).then(function () {
         var records = [];
 
-        Object.keys(namesMap).forEach(function (key) {
-          namesMap[key].forEach(function (record) {
+        Object.keys(zonesMap).forEach(function (key) {
+          zonesMap[key].forEach(function (record) {
             records.push(record);
           });
         });

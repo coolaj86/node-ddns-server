@@ -52,20 +52,26 @@ module.exports.create = function (ndns, conf, store) {
       , type: ndns.consts.QTYPE_TO_NAME[q.type]
       , class: ndns.consts.QCLASS_TO_NAME[q.class]
       };
-    })).then(function (zone) {
+        // TODO promise?
+    }), function (err, zone) {
+      if (err) {
+        throw err;
+      }
+
       var matches = [];
 
       // TODO match '*.example.com'
       // TODO ANAME for root CNAME 'example.com'
       zone.forEach(function (a) {
         request.question.forEach(function (q) {
-          if (a.name === q.name && a.type === q.type) {
-            matches.push(a);
+          if (a.name === q.name) {
+            if (a.type === ndns.consts.QTYPE_TO_NAME[q.type]) {
+              matches.push(a);
+            }
           }
         });
       });
 
-      //console.log('answer', answer);
       response.answer = matches.map(function (a) {
         // TODO why have values as array? just old code I think (for TXT?)
         if ((a.value || a.answer) && !a.values) {
@@ -213,6 +219,6 @@ module.exports.create = function (ndns, conf, store) {
       typename = 'any';
     }
 
-    handlers[typename](store, request, response);
+    handlers[typename](ndns, conf, store, request, response);
   };
 };
