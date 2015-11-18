@@ -2,7 +2,7 @@
   "name": "dynamic-dns-server",
   "version": "0.5.0",
   "description": "Dynamic DNS Server",
-  "main": "index.js",
+  "main": "wrapper.js",
   "scripts": {
     "test": "echo ERROR no tests; exit 1"
   },
