@@ -1,0 +1,16 @@
+{ "node": true
+, "browser": true
+, "jquery": true
+, "globals": { "angular": true }
+
+, "indent": 2
+, "laxcomma": true
+, "laxbreak": true
+, "curly": true
+
+, "eqeqeq": true
+, "immed": true
+, "undef": true
+, "unused": true
+, "latedef": true
+}

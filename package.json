@@ -1,0 +1,23 @@
+{
+  "name": "dynamic-dns-server",
+  "version": "0.5.0",
+  "description": "Dynamic DNS Server",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo ERROR no tests; exit 1"
+  },
+  "dependencies": {
+    "bluebird": "^3.0.5",
+    "native-dns": "^0.7.0"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Daplie/node-ddns.git"
+  },
+  "author": "AJ ONeal <awesome@coolaj86.com> (https://coolaj86.com)",
+  "contributors": [
+    "Naoki Takimura"
+  ],
+  "license": "Apache-2.0"
+}
