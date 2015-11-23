@@ -15,7 +15,7 @@ module.exports.create = function (ndns, conf, store) {
 
   conf.nameservers.forEach(function (ns) {
     if (!ns.name || !ns.ipv4) {
-      console.log(ns);
+      console.error('nameserver object:', ns);
       throw new Error("You must supply options with nameservers { name: 'ns1.example.com', ipv4: '127.0.0.1' }");
     }
   });
@@ -47,7 +47,7 @@ module.exports.create = function (ndns, conf, store) {
       "admin": "hostmaster." + name,
       // YYYYmmddss
       // http://mxtoolbox.com/problem/dns/DNS-SOA-Serial-Number-Format
-      "serial": "2015062300",
+      "serial": "2015112300",
       "refresh": "10800",
       "retry": "3600",
       // 14 days
@@ -80,11 +80,13 @@ module.exports.create = function (ndns, conf, store) {
         throw err;
       }
 
+      var names = [];
+      var patterns = [];
       var matchesMap = {};
       var matches = [];
 
       function pushMatch(a) {
-        var id = a.name + a.type + (a.address || a.data || a.values);
+        var id = a.name + ':' + a.type + ':' + a.value;
         if (!matchesMap[id]) {
           matchesMap[id] = true;
           matches.push(a);
@@ -93,74 +95,95 @@ module.exports.create = function (ndns, conf, store) {
 
       // TODO ANAME for when we want to use a CNAME with a root (such as 'example.com')
       zone.forEach(function (a) {
-        if ('*' === a.name[0]) {
+        if ('*' === a.name[0] && '.' === a.name[1]) {
           // *.example.com => .example.com (valid)
           // *example.com => example.com (invalid, but still safe)
           // TODO clone a
           a.name = a.name.slice(1);
         }
-      });
-      zone.sort(function (a, b) {
-        // IMPORTANT: wildcard should come last
-        // .example.com (*.example.com)
-        if ('*' === a.name[0] || '.' === a.name[0]) {
-          return 9001; // over 9000!
-        }
 
+        if ('.' === a.name[0]) {
+          patterns.push(a);
+        }
+        else {
+          names.push(a);
+        }
+      });
+
+      function byDomainLen(a, b) {
         // sort most to least explicit
         // .www.example.com
         // www.example.com
         // a.example.com
         return (b.name || b.zone).length - (a.name || a.zone).length;
-      });
-      zone.forEach(function (a) {
+      }
+
+      names.sort(byDomainLen);
+      patterns.sort(byDomainLen);
+
+      function testType(q, a) {
+        var qtype = ndns.consts.QTYPE_TO_NAME[q.type];
+
+        if (a.type === qtype) {
+          pushMatch(a);
+          return;
+        }
+
+        if (-1 !== ['A', 'AAAA'].indexOf(qtype)) {
+          if ('ANAME' === a.type) {
+            // TODO clone a
+            a.realtype = qtype;
+            pushMatch(a);
+          }
+          else if ('CNAME' === a.type) {
+            pushMatch(a);
+          }
+        }
+      }
+
+      names.forEach(function (a) {
         request.question.forEach(function (q) {
-          var isWild;
-          var qtype = ndns.consts.QTYPE_TO_NAME[q.type];
-          if (a.name === q.name) {
-            if (a.type !== qtype) {
-              pushMatch(a);
-            }
-            else if ((-1 !== ['A', 'AAAA'].indexOf(qtype)) && 'ANAME' === a.type) {
-              a.realtype = qtype;
-              pushMatch(a);
-            }
+          if (a.name !== q.name) {
+            return;
           }
-          // NOTE: we don't want to add the *.xyz.com record where literal www.xyz.com exists
-          else if (!matches.length && '.' === a.name[0] && (q.name.length > a.name.length)) {
-            isWild = (a.name === q.name.slice(q.name.length - a.name.length))
-              // .example.com should match example.com if none set
-              || (a.name.slice(1) === q.name.slice(q.name.length - (a.name.length - 1)))
-              ;
-            if (!isWild) {
-              return;
-            }
-            if (a.type === qtype) {
-              // TODO clone a
-              a.name = q.name;
-              pushMatch(a);
-            }
-            else if ((-1 !== ['A', 'AAAA'].indexOf(qtype)) && 'ANAME' === a.type) {
-              // TODO clone a
-              a.name = q.name;
-              a.realtype = qtype;
-              pushMatch(a);
-            }
-          }
+
+          testType(q, a);
         });
       });
 
+      if (!matches.length) {
+        patterns.forEach(function (a) {
+          request.question.forEach(function (q) {
+            var isWild;
+
+            isWild = (a.name === q.name.slice(q.name.length - a.name.length))
+              // should .example.com match example.com if none set?
+              // (which would mean any ANAME must be a CNAME)
+              //|| (a.name.slice(1) === q.name.slice(q.name.length - (a.name.length - 1)))
+              ;
+
+            if (!isWild) {
+              return;
+            }
+
+            // TODO clone a
+            a.name = q.name;
+            testType(q, a);
+          });
+        });
+      }
+
       return PromiseA.all(matches.map(function (a) {
-        // TODO why have values as array? just old code I think (for TXT?)
-        if ((a.value || a.answer) && !a.values) {
-          a.values = [a.value || a.answer];
+        if (a.value) {
+          a.values = [a.value];
         }
 
+        // TODO alias value as the appropriate thing?
         var result = {
           name: a.name
-        , address: a.address || a.values[0]
+        , address: a.address || a.value
         , data: a.data || a.values
-        , exchange: a.exchange || a.values[0]
+        , exchange: a.exchange || a.value
         , priority: a.priority || 10
         , ttl: a.ttl || 600
         };
