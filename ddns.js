@@ -1,12 +1,24 @@
 'use strict';
 
 module.exports.create = function (ndns, conf, store) {
+
   // TODO move promise to dependencies
   var PromiseA = require('bluebird');
 
   if (!conf || !conf.primaryNameserver) {
     throw new Error("You must supply options, at least { primaryNamserver: 'ns1.example.com' }");
   }
+
+  if (!conf.nameservers.length) {
+    throw new Error("You must supply options with nameservers [{ ... }]");
+  }
+
+  conf.nameservers.forEach(function (ns) {
+    if (!ns.name || !ns.ipv4) {
+      console.log(ns);
+      throw new Error("You must supply options with nameservers { name: 'ns1.example.com', ipv4: '127.0.0.1' }");
+    }
+  });
 
   function setLocalhost(request, response, value) {
     var type = ndns.consts.QTYPE_TO_NAME[request.question[0].type];
@@ -48,20 +60,36 @@ module.exports.create = function (ndns, conf, store) {
   }
 
   function handleAny(ndns, conf, store, request, response) {
-    store.getAnswerList(request && request.question.map(function (q) {
-      // TODO give the bits is well (for convenience)
-      return {
-        name: q.name
-      , type: ndns.consts.QTYPE_TO_NAME[q.type]
-      , class: ndns.consts.QCLASS_TO_NAME[q.class]
-      };
-        // TODO promise?
-    }), function (err, zone) {
+    var qs;
+
+    if (request) {
+      qs = request.question.map(function (q) {
+        // TODO give the bits is well (for convenience)
+        return {
+          name: q.name
+        , type: ndns.consts.QTYPE_TO_NAME[q.type]
+        , class: ndns.consts.QCLASS_TO_NAME[q.class]
+        };
+          // TODO promise?
+      });
+    }
+
+    store.getAnswerList(qs, function (err, zone) {
+      // TODO clarify a.address vs a.data vs a.values
       if (err) {
         throw err;
       }
 
+      var matchesMap = {};
       var matches = [];
+
+      function pushMatch(a) {
+        var id = a.name + a.type + (a.address || a.data || a.values);
+        if (!matchesMap[id]) {
+          matchesMap[id] = true;
+          matches.push(a);
+        }
+      }
 
       // TODO ANAME for when we want to use a CNAME with a root (such as 'example.com')
       zone.forEach(function (a) {
@@ -71,30 +99,52 @@ module.exports.create = function (ndns, conf, store) {
           // TODO clone a
           a.name = a.name.slice(1);
         }
+      });
+      zone.sort(function (a, b) {
+        // IMPORTANT: wildcard should come last
+        // .example.com (*.example.com)
+        if ('*' === a.name[0] || '.' === a.name[0]) {
+          return 9001; // over 9000!
+        }
+
+        // sort most to least explicit
+        // .www.example.com
+        // www.example.com
+        // a.example.com
+        return (b.name || b.zone).length - (a.name || a.zone).length;
+      });
+      zone.forEach(function (a) {
         request.question.forEach(function (q) {
+          var isWild;
           var qtype = ndns.consts.QTYPE_TO_NAME[q.type];
           if (a.name === q.name) {
-            if (a.type === qtype) {
-              matches.push(a);
+            if (a.type !== qtype) {
+              pushMatch(a);
             }
             else if ((-1 !== ['A', 'AAAA'].indexOf(qtype)) && 'ANAME' === a.type) {
               a.realtype = qtype;
-              matches.push(a);
+              pushMatch(a);
             }
           }
-          else if ('.' === a.name[0] && (q.name.length > a.name.length)) {
-            if (a.name === q.name.slice(q.name.length - a.name.length)) {
-              if (a.type === qtype) {
-                // TODO clone a
-                a.name = q.name;
-                matches.push(a);
-              }
-              else if ((-1 !== ['A', 'AAAA'].indexOf(qtype)) && 'ANAME' === a.type) {
-                // TODO clone a
-                a.name = q.name;
-                a.realtype = qtype;
-                matches.push(a);
-              }
+          // NOTE: we don't want to add the *.xyz.com record where literal www.xyz.com exists
+          else if (!matches.length && '.' === a.name[0] && (q.name.length > a.name.length)) {
+            isWild = (a.name === q.name.slice(q.name.length - a.name.length))
+              // .example.com should match example.com if none set
+              || (a.name.slice(1) === q.name.slice(q.name.length - (a.name.length - 1)))
+              ;
+            if (!isWild) {
+              return;
+            }
+            if (a.type === qtype) {
+              // TODO clone a
+              a.name = q.name;
+              pushMatch(a);
+            }
+            else if ((-1 !== ['A', 'AAAA'].indexOf(qtype)) && 'ANAME' === a.type) {
+              // TODO clone a
+              a.name = q.name;
+              a.realtype = qtype;
+              pushMatch(a);
             }
           }
         });
@@ -115,8 +165,14 @@ module.exports.create = function (ndns, conf, store) {
         , ttl: a.ttl || 600
         };
 
-        if ('CNAME' === a.type && Array.isArray(result.data)) {
-          result.data = result.data[0];
+        if ('CNAME' === a.type) {
+          if (Array.isArray(result.data)) {
+            result.data = result.data[0];
+          }
+          if (!result.data) {
+            console.error('[CNAME ERROR]');
+            console.error(result);
+          }
         }
         // I think the TXT record requires an array
         if ('TXT' === a.type && !Array.isArray(result.data)) {

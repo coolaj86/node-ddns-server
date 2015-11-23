@@ -32,8 +32,14 @@ module.exports.create = function (port, address4, conf, getAnswerList) {
 
   function onRequestError(err, request, response) {
     console.error('[onRequestError] application logic failed');
-    console.error(request);
     console.error(err && err.stack || err || "Unknown Error");
+    if (request && request.question) {
+      // this should always happen
+      console.error(request.question);
+    } else {
+      // this should never happen
+      console.error(request);
+    }
     try {
       if (response && response.send) {
         response.send();
