@@ -1,6 +1,9 @@
 'use strict';
 
 module.exports.create = function (ndns, conf, store) {
+  // TODO move promise to dependencies
+  var PromiseA = require('bluebird');
+
   if (!conf || !conf.primaryNameserver) {
     throw new Error("You must supply options, at least { primaryNamserver: 'ns1.example.com' }");
   }
@@ -60,19 +63,44 @@ module.exports.create = function (ndns, conf, store) {
 
       var matches = [];
 
-      // TODO match '*.example.com'
-      // TODO ANAME for root CNAME 'example.com'
+      // TODO ANAME for when we want to use a CNAME with a root (such as 'example.com')
       zone.forEach(function (a) {
+        if ('*' === a.name[0]) {
+          // *.example.com => .example.com (valid)
+          // *example.com => example.com (invalid, but still safe)
+          // TODO clone a
+          a.name = a.name.slice(1);
+        }
         request.question.forEach(function (q) {
+          var qtype = ndns.consts.QTYPE_TO_NAME[q.type];
           if (a.name === q.name) {
-            if (a.type === ndns.consts.QTYPE_TO_NAME[q.type]) {
+            if (a.type === qtype) {
               matches.push(a);
+            }
+            else if ((-1 !== ['A', 'AAAA'].indexOf(qtype)) && 'ANAME' === a.type) {
+              a.realtype = qtype;
+              matches.push(a);
+            }
+          }
+          else if ('.' === a.name[0] && (q.name.length > a.name.length)) {
+            if (a.name === q.name.slice(q.name.length - a.name.length)) {
+              if (a.type === qtype) {
+                // TODO clone a
+                a.name = q.name;
+                matches.push(a);
+              }
+              else if ((-1 !== ['A', 'AAAA'].indexOf(qtype)) && 'ANAME' === a.type) {
+                // TODO clone a
+                a.name = q.name;
+                a.realtype = qtype;
+                matches.push(a);
+              }
             }
           }
         });
       });
 
-      response.answer = matches.map(function (a) {
+      return PromiseA.all(matches.map(function (a) {
         // TODO why have values as array? just old code I think (for TXT?)
         if ((a.value || a.answer) && !a.values) {
           a.values = [a.value || a.answer];
@@ -96,9 +124,12 @@ module.exports.create = function (ndns, conf, store) {
         }
 
         return ndns[a.type](result);
+      })).then(function (answers) {
+        response.answer = answers.filter(function (a) {
+          return a;
+        });
+        response.send();
       });
-
-      response.send();
     });
   }
 

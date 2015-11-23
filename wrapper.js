@@ -4,8 +4,9 @@ module.exports.create = function (walnutConf, deps/*, options*/) {
   // TODO there needs to be a way to get the config from the system db
   var PromiseA = deps.Promise;
   var wrap = require('dbwrap');
-  var port = 53;
-  var address4 = '0.0.0.0';
+  var port = walnutConf.ddnsPort || 53;
+  var address4 = walnutConf.ddnsAddress4 || '0.0.0.0';
+  //var address6 = walnutConf.ddnsAddress6 || '0.0.0.0';
   var conf = {
     primaryNameserver: walnutConf.primaryNameserver
   , nameservers: walnutConf.nameservers
