@@ -1,9 +1,9 @@
-Node.js DDNS API
+Node.js DDNS UDP Server
 ======
 
 **STOP:** You probably want [node-ddns](https://github.com/Daplie/node-ddns)
 
-A Dynamic DNS (DDNS / DynDNS) API written in node.js.
+A Dynamic DNS (DDNS / DynDNS) UDP Server written in node.js.
 
 This is one distinct part of a 3-part system.
 
