@@ -1,6 +1,6 @@
 {
-  "name": "dynamic-dns-server",
-  "version": "0.5.0",
+  "name": "com.daplie.ddns.service",
+  "version": "1.0.0",
   "description": "Dynamic DNS Server",
   "main": "wrapper.js",
   "scripts": {
@@ -13,11 +13,8 @@
   "devDependencies": {},
   "repository": {
     "type": "git",
-    "url": "https://github.com/Daplie/node-ddns.git"
+    "url": "https://github.com/Daplie/node-ddns-server.git"
   },
-  "author": "AJ ONeal <awesome@coolaj86.com> (https://coolaj86.com)",
-  "contributors": [
-    "Naoki Takimura"
-  ],
-  "license": "Apache-2.0"
+  "author": "AJ ONeal <coolaj86@gmail.com> (https://coolaj86.com)",
+  "license": "(MIT OR Apache-2.0)"
 }
