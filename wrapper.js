@@ -1,16 +1,15 @@
 'use strict';
 
 module.exports.create = function (walnutConf, deps/*, options*/) {
+  var conf = walnutConf.ddns || walnutConf || {};
+  //  primaryNameserver: walnutConf.ddns.primaryNameserver
+  //, nameservers: walnutConf.ddns.nameservers
   // TODO there needs to be a way to get the config from the system db
   var PromiseA = deps.Promise;
   var wrap = require('masterquest-sqlite3');
-  var port = walnutConf.ddnsPort || 53;
-  var address4 = walnutConf.ddnsAddress4 || '0.0.0.0';
-  //var address6 = walnutConf.ddnsAddress6 || '0.0.0.0';
-  var conf = {
-    primaryNameserver: walnutConf.primaryNameserver
-  , nameservers: walnutConf.nameservers
-  };
+  var port = conf.port || 53;
+  var address4 = conf.ipv4 || '0.0.0.0';
+  //var address6 = conf.ipv6 || '::';
   var dir = [
     // TODO consider zones separately from domains
     // i.e. jake.smithfamily.com could be owned by jake alone

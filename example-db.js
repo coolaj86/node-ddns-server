@@ -11,28 +11,31 @@ module.exports.create = function () {
         , type: q.type
         , ttl: 600
         , priority: 10
-        , answer: null
+        , address: null
+        , data: null
         };
 
         switch(q.type) {
           case 'AAAA':
-            a.answer = '0:0:0:0:0:0:0:1'; // '::1';
+            a.address = '0:0:0:0:0:0:0:1'; // '::1';
             break;
 
           case 'MX':
           case 'A':
           case 'CNAME':
             a.type = 'CNAME';
-            a.answer = 'example-cname' + q.name;
+            a.address = 'example-cname.' + q.name;
+            a.data = 'example-cname.' + q.name;
             // NOTE: when implementing you TODO do CNAME lookup and return multiple A records
             answers.push(a);
             // NOTE an implementer should do the lookup
             answers.push({
               type: q.type
-            , name: 'example-cname' + q.name
+            , name: 'example-cname.' + q.name
             , ttl: 600
             , priority: null
-            , answer: '127.0.0.1'
+            , address: '127.0.0.1'
+            , data: '127.0.0.1'
             });
             return;
 
@@ -41,7 +44,9 @@ module.exports.create = function () {
         }
 
         answers.push(a);
-      }).filter(function (a) {
+      });
+
+      answers = answers.filter(function (a) {
         return a;
       });
 
