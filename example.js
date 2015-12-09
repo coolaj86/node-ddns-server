@@ -142,16 +142,21 @@ module.exports.create = function (port, address4, conf, getAnswerList) {
   };
 };
 
-var port = 53;
+var port = 5353;
 var address4 = '0.0.0.0';
 var conf = {
   primaryNameserver: "ns1.example.com"
-, nameservers: ["ns1.example.com", "ns2.example.com", "ns3.example.com", "ns4.example.com"]
+, nameservers: [
+    { name: "ns1.example.com", ipv4: '127.0.0.1' }
+  , { name: "ns2.example.com", ipv4: '127.0.0.1' }
+  , { name: "ns3.example.com", ipv4: '127.0.0.1' }
+  , { name: "ns4.example.com", ipv4: '127.0.0.1' }
+  ]
 };
 function getAnswerList(questions, cb) {
   // cb is of type function (err, answers) { }
   // answers is an array of type { name: string, type: string, priority: int, ttl: int, answer: string }
-  require('./example-db').getAnswerList(questions, cb);
+  require('./example-db').create().getAnswerList(questions, cb);
 }
 module.exports.create(port, address4, conf, getAnswerList).listen().then(function (closer) {
   console.log('listening');
@@ -160,5 +165,5 @@ module.exports.create(port, address4, conf, getAnswerList).listen().then(functio
     closer.close().then(function () {
       console.log('closed');
     });
-  }, 3 * 1000);
+  }, 30 * 1000);
 });
