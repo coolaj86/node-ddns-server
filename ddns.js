@@ -224,7 +224,7 @@ module.exports.create = function (ndns, conf, store) {
       // dig soa google.com @ns1.google.com
 
       // TODO auto-increment serial number as epoch timestamp (in seconds) of last record update for that domain
-      if (false && /^ns\d\./.test(name)) {
+      if (false && /^ns\d\./i.test(name)) {
         /*
         soa.ttl = 60;
 
@@ -326,7 +326,12 @@ module.exports.create = function (ndns, conf, store) {
     // although the standard defines the posibility of multiple queries,
     // in practice there is only one query per request
     var question = response.question[0];
+    var wname = question && question.name || '';
+    var lname = question && question.name.toLowerCase() || '';
     var typename = ndns.consts.QTYPE_TO_NAME[question && question.type];
+    if (question) {
+      question.name = lname;
+    }
     if (question && /coolaj86.com$/i.test(question.name)) {
       console.log('\n\n');
       //console.log('request keys', Object.keys(request));
@@ -383,7 +388,7 @@ module.exports.create = function (ndns, conf, store) {
         response.authority.push(ndns.SOA(getSoa(conf, store, request)));
       }
 
-      if (request.question[0] && /coolaj86.com/.test(request.question[0].name)) {
+      if (request.question[0] && /coolaj86.com$/i.test(request.question[0].name)) {
         response.debug = 1;
         console.log('response.header', response.header);
         console.log('response.edns_version', response.edns_version);
@@ -391,6 +396,17 @@ module.exports.create = function (ndns, conf, store) {
         console.log('response.authority', response.authority);
         console.log('response.additional', response.additional);
       }
+
+      // Because WWw.ExaMPLe.coM increases security...
+      // https://github.com/letsencrypt/boulder/issues/1228
+      // https://github.com/letsencrypt/boulder/issues/1243
+      ['answer', 'additional', 'authority'].forEach(function (atype) {
+        response[atype].forEach(function (a) {
+          if (a.name) {
+            a.name = a.name.replace(lname, wname);
+          }
+        });
+      });
 
       response.send();
     });

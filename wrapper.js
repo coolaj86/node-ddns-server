@@ -72,7 +72,9 @@ module.exports.create = function (walnutConf, deps/*, options*/) {
       // smithfamily.com // this is the zone (sorry jake, no zone for you)
       questions.forEach(function (q) {
         // TODO how to get zone fast and then get records?
-        var parts = q.name.split('.').filter(function (n) {
+        // NOTE: LetsEncrypt does this kind of crap (on purpose): WwW.EXAmpLe.coM
+        // and then they expect it to come BACK in the same weird way for... security?
+        var parts = q.name.toLowerCase().split('.').filter(function (n) {
           return n;
         });
         var zone = parts.slice(-2).join('.');
