@@ -46,6 +46,11 @@ Test
 dig @localhost -p 5353 example.com
 ```
 
+We're still working through getting all of these tests to pass:
+
+* https://ednscomp.isc.org/ednscomp/ - precise errors and corresponding `dig` commands
+* http://dnsviz.net/ - visual tree representation
+* http://mxtoolbox.com/DNSLookup.aspx - basic checks
 
 LICENSE
 =======
