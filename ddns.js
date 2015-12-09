@@ -323,8 +323,11 @@ module.exports.create = function (ndns, conf, store) {
   };
 
   return function (request, response) {
-    var typename = ndns.consts.QTYPE_TO_NAME[request && request.question[0].type];
-    if (request.question[0] && /coolaj86.com$/i.test(request.question[0].name)) {
+    // although the standard defines the posibility of multiple queries,
+    // in practice there is only one query per request
+    var question = response.question[0];
+    var typename = ndns.consts.QTYPE_TO_NAME[question && question.type];
+    if (question && /coolaj86.com$/i.test(question.name)) {
       console.log('\n\n');
       //console.log('request keys', Object.keys(request));
       console.log('request.question:', request.question.map(function (q) {
@@ -374,7 +377,9 @@ module.exports.create = function (ndns, conf, store) {
         response.edns_version = 0;
       }
 
-      if (!response.answer.length && 'undefined' === typeof response.edns_version) {
+      // 'undefined' === typeof response.edns_version
+      //  && -1 !== ['IN', 'A'].indexOf(typename)
+      if (!response.answer.length) {
         response.authority.push(ndns.SOA(getSoa(conf, store, request)));
       }
 
