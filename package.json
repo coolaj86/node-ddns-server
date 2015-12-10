@@ -2,7 +2,8 @@
   "name": "com.daplie.ddns.service",
   "version": "1.0.0",
   "description": "Dynamic DNS Server",
-  "main": "wrapper.js",
+  "main": "ddns.js",
+  "walnut": "wrapper.js",
   "scripts": {
     "test": "echo ERROR no tests; exit 1"
   },

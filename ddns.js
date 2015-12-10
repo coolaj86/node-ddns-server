@@ -224,7 +224,7 @@ module.exports.create = function (ndns, conf, store) {
       // dig soa google.com @ns1.google.com
 
       // TODO auto-increment serial number as epoch timestamp (in seconds) of last record update for that domain
-      if (false && /^ns\d\./.test(name)) {
+      if (false && /^ns\d\./i.test(name)) {
         /*
         soa.ttl = 60;
 
@@ -323,12 +323,29 @@ module.exports.create = function (ndns, conf, store) {
   };
 
   return function (request, response) {
-    var typename = ndns.consts.QTYPE_TO_NAME[request && request.question[0].type];
-    if (request.question[0] && /coolaj86.com/.test(request.question[0].name)) {
+    // although the standard defines the posibility of multiple queries,
+    // in practice there is only one query per request
+    var question = response.question[0];
+    var wname = question && question.name || '';
+    var lname = question && question.name.toLowerCase() || '';
+    var typename = ndns.consts.QTYPE_TO_NAME[question && question.type];
+    if (question) {
+      question.name = lname;
+    }
+    if (question && /coolaj86.com$/i.test(question.name)) {
       console.log('\n\n');
-      console.log('request', request.question);
-      console.log('type', ndns.consts.QTYPE_TO_NAME[request.question[0].type]);
-      console.log('class',ndns.consts.QCLASS_TO_NAME[request.question[0].class]);
+      //console.log('request keys', Object.keys(request));
+      console.log('request.question:', request.question.map(function (q) {
+        q.qtype = ndns.consts.QTYPE_TO_NAME[q.type];
+        q.qclass = ndns.consts.QCLASS_TO_NAME[q.class];
+        return JSON.stringify(q);
+      }));
+
+      console.log('request.additional:', request.additional.map(function (q) {
+        q.qtype = ndns.consts.QTYPE_TO_NAME[q.type];
+        q.qclass = ndns.consts.QCLASS_TO_NAME[q.class];
+        return JSON.stringify(q);
+      }));
     }
 
     // This is THE authority
@@ -339,14 +356,58 @@ module.exports.create = function (ndns, conf, store) {
     }
 
     handlers[typename](ndns, conf, store, request, response, function () {
-      if (request.question[0] && /coolaj86.com/.test(request.question[0].name)) {
-        console.log(response.answer);
-        console.log(response.authority);
-        console.log(response.additional);
+      var opt;
+      var opt2;
+
+      if (request.additional.some(function (q) {
+        // ndns.consts.NAME_TO_QTYPE.OPT // 41
+        if (ndns.consts.NAME_TO_QTYPE.OPT === q.type) {
+          if (opt) {
+            opt2 = q;
+          }
+          opt = q;
+        }
+        return q;
+      })) {
+        response.header.rcode = ndns.consts.NAME_TO_RCODE.NOERROR; // No Error
+
+        if (0 !== opt.version) {
+          response.header.rcode = ndns.consts.NAME_TO_RCODE.BADVERS; // Bad Version
+        }
+
+        if (opt2) {
+          response.header.rcode = ndns.consts.NAME_TO_RCODE.FORMERR; // Format Error
+        }
+
+        response.edns_version = 0;
       }
+
+      // 'undefined' === typeof response.edns_version
+      //  && -1 !== ['IN', 'A'].indexOf(typename)
       if (!response.answer.length) {
         response.authority.push(ndns.SOA(getSoa(conf, store, request)));
       }
+
+      if (request.question[0] && /coolaj86.com$/i.test(request.question[0].name)) {
+        response.debug = 1;
+        console.log('response.header', response.header);
+        console.log('response.edns_version', response.edns_version);
+        console.log('response.answer', response.answer);
+        console.log('response.authority', response.authority);
+        console.log('response.additional', response.additional);
+      }
+
+      // Because WWw.ExaMPLe.coM increases security...
+      // https://github.com/letsencrypt/boulder/issues/1228
+      // https://github.com/letsencrypt/boulder/issues/1243
+      ['answer', 'additional', 'authority'].forEach(function (atype) {
+        response[atype].forEach(function (a) {
+          if (a.name) {
+            a.name = a.name.replace(lname, wname);
+          }
+        });
+      });
+
       response.send();
     });
   };
