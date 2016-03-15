@@ -338,6 +338,7 @@ module.exports.create = function (ndns, conf, store) {
     if (question) {
       question.name = lname;
     }
+    /*
     if (question && /coolaj86.com$/i.test(question.name)) {
       console.log('\n\n');
       //console.log('request keys', Object.keys(request));
@@ -353,6 +354,7 @@ module.exports.create = function (ndns, conf, store) {
         return JSON.stringify(q);
       }));
     }
+    */
 
     // This is THE authority
     response.header.aa = 1;
@@ -394,6 +396,7 @@ module.exports.create = function (ndns, conf, store) {
         response.authority.push(ndns.SOA(getSoa(conf, store, request)));
       }
 
+      /*
       if (request.question[0] && /coolaj86.com$/i.test(request.question[0].name)) {
         response.debug = 1;
         console.log('response.header', response.header);
@@ -402,6 +405,7 @@ module.exports.create = function (ndns, conf, store) {
         console.log('response.authority', response.authority);
         console.log('response.additional', response.additional);
       }
+      */
 
       // Because WWw.ExaMPLe.coM increases security...
       // https://github.com/letsencrypt/boulder/issues/1228
