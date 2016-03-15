@@ -88,6 +88,7 @@ module.exports.create = function (walnutConf, deps/*, options*/) {
           // aj.daplie.me
           // daplie.me
           // TODO the case of aj.daplie.me + aj@daplie.me
+          // TODO use tld, private tld, and public suffix lists instead
           while (parts.length >= 2) {
             zone = parts.join('.');
             parts.shift();
