@@ -64,7 +64,7 @@ module.exports.create = function (ndns, conf, store) {
     return soa;
   }
 
-  function handleAny(ndns, conf, store, request, response, cb) {
+  function handleAll(ndns, conf, store, request, response, cb) {
     var qs;
 
     if (request) {
@@ -144,6 +144,15 @@ module.exports.create = function (ndns, conf, store) {
             pushMatch(a);
           }
         }
+
+        if ('ANY' === qtype) {
+          if ('ANAME' === a.type) {
+            // TODO clone a
+            a.realtype = 'A';
+          }
+
+          pushMatch(a);
+        }
       }
 
       names.forEach(function (a) {
@@ -209,12 +218,27 @@ module.exports.create = function (ndns, conf, store) {
 
         return ndns[a.type](result);
       })).then(function (answers) {
-        response.answer = answers.filter(function (a) {
+        response.answer = response.answer.concat(answers.filter(function (a) {
           return a;
-        });
+        }));
         // response.send();
         cb();
       });
+    });
+  }
+
+  function addNs(ndns, conf, store, request, response) {
+    conf.nameservers.forEach(function (ns) {
+      response.answer.push(ndns.NS({
+        name: request.question[0].name
+      , data: ns.name
+      , ttl: 60 * 60
+      }));
+      response.additional.push(ndns.A({
+        name: ns.name
+      , address: ns.ipv4
+      , ttl: 60 * 60
+      }));
     });
   }
 
@@ -237,19 +261,7 @@ module.exports.create = function (ndns, conf, store) {
       } else {
         response.answer.push(ndns.SOA(getSoa(conf, store, request)));
 
-        conf.nameservers.forEach(function (ns) {
-          response.authority.push(ndns.NS({
-            name: request.question[0].name
-          , data: ns.name
-          , ttl: 60 * 60
-          }));
-
-          response.additional.push(ndns.A({
-            name: ns.name
-          , address: ns.ipv4
-          , ttl: 60 * 60
-          }));
-        });
+        addNs(ndns, conf, store, request, response);
 
         //response.send();
         cb();
@@ -279,18 +291,7 @@ module.exports.create = function (ndns, conf, store) {
       //console.log('response.authority');
       //console.log(response.authority);
 
-      conf.nameservers.forEach(function (ns) {
-        response.answer.push(ndns.NS({
-          name: request.question[0].name
-        , data: ns.name
-        , ttl: 60 * 60
-        }));
-        response.additional.push(ndns.A({
-          name: ns.name
-        , address: ns.ipv4
-        , ttl: 60 * 60
-        }));
-      });
+      addNs(ndns, conf, store, request, response);
 
       cb();
       //response.send();
@@ -303,7 +304,7 @@ module.exports.create = function (ndns, conf, store) {
         return;
       }
 
-      handleAny(ndns, conf, store, request, response, cb);
+      handleAll(ndns, conf, store, request, response, cb);
     }
   , AAAA: function (ndns, conf, store, request, response, cb) {
       if (/^local(host)?\./.test(request.question[0].name)) {
@@ -313,13 +314,18 @@ module.exports.create = function (ndns, conf, store) {
         return;
       }
 
-      handleAny(ndns, conf, store, request, response, cb);
+      handleAll(ndns, conf, store, request, response, cb);
     }
-  , CNAME: handleAny
-  , MX: handleAny
-  , SRV: handleAny
-  , TXT: handleAny
-  , any: handleAny
+  , ANY: function handleAny(ndns, conf, store, request, response, cb) {
+      addNs(ndns, conf, store, request, response);
+
+      handleAll(ndns, conf, store, request, response, cb);
+    }
+  , CNAME: handleAll
+  , MX: handleAll
+  , SRV: handleAll
+  , TXT: handleAll
+  , any: handleAll
   };
 
   return function (request, response) {
@@ -332,6 +338,7 @@ module.exports.create = function (ndns, conf, store) {
     if (question) {
       question.name = lname;
     }
+    /*
     if (question && /coolaj86.com$/i.test(question.name)) {
       console.log('\n\n');
       //console.log('request keys', Object.keys(request));
@@ -347,6 +354,7 @@ module.exports.create = function (ndns, conf, store) {
         return JSON.stringify(q);
       }));
     }
+    */
 
     // This is THE authority
     response.header.aa = 1;
@@ -388,6 +396,7 @@ module.exports.create = function (ndns, conf, store) {
         response.authority.push(ndns.SOA(getSoa(conf, store, request)));
       }
 
+      /*
       if (request.question[0] && /coolaj86.com$/i.test(request.question[0].name)) {
         response.debug = 1;
         console.log('response.header', response.header);
@@ -396,6 +405,7 @@ module.exports.create = function (ndns, conf, store) {
         console.log('response.authority', response.authority);
         console.log('response.additional', response.additional);
       }
+      */
 
       // Because WWw.ExaMPLe.coM increases security...
       // https://github.com/letsencrypt/boulder/issues/1228
